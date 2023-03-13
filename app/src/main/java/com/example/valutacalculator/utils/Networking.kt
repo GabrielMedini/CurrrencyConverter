@@ -5,7 +5,7 @@ import okhttp3.MediaType.Companion.toMediaTypeOrNull
 
 
 /**
- * Main Class that handles Networking by using OkHttpClient
+ * Main Networking Class that sets up OkHttpClient
  */
 class Networking(private val client: OkHttpClient, private val tag: String) {
 
