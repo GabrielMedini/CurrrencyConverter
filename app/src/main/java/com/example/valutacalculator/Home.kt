@@ -21,10 +21,14 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.example.valutacalculator.data.*
+import com.example.valutacalculator.data.Currency
 import com.example.valutacalculator.ui.theme.CurrencyConverterTheme
 import com.example.valutacalculator.utils.CurrencyCalculator
 import kotlinx.coroutines.launch
 import java.math.BigDecimal
+import java.math.RoundingMode
+import java.text.DateFormat.getDateInstance
+import java.util.*
 
 
 val currencyListFrom = setCurrencyList()
@@ -88,10 +92,14 @@ fun MainCurrencyBox(
     var calculatedToValue by rememberSaveable{
         mutableStateOf(BigDecimal(0))
     }
+    //Text for "" instead of 0 on empty value to (currency):
+    var calculatedToValueText by rememberSaveable{
+        mutableStateOf("100")
+    }
     //Calculates the to currency value:
     val calculateToValue: () -> Unit = {
         coroutineScope.launch {
-            calculatedToValue = calculatedFromValue * calculationNumber
+            calculatedToValue = (calculatedFromValue * calculationNumber).setScale(2, RoundingMode.HALF_UP)
         }
     }
     //Fetching conversation number from server, Class: CurrencyCalculator:
@@ -117,6 +125,14 @@ fun MainCurrencyBox(
         firstLaunch = false
     }
 
+    //Date updated from on server, this value is static on server:
+    //Format time:
+    val dateFormat = getDateInstance()
+    val cal = Calendar.getInstance()
+    cal.add(Calendar.DATE, -1)
+    val updatedDate = dateFormat.format(cal.time)
+
+
     //Main UI windows:
     Column(modifier = modifier
         .padding(horizontal = 16.dp, vertical = 16.dp)
@@ -127,19 +143,22 @@ fun MainCurrencyBox(
             onClick = { showFromCurrencyList = !showFromCurrencyList },
             onValueChange = {fromValue ->
                 if(fromValue != "") {
-                calculatedFromValue = fromValue.toBigDecimal()
-                calculateToValue()
+                    calculatedFromValue = fromValue.toBigDecimal()
+                    calculatedToValueText = fromValue
+                    calculateToValue()
                 } else {
                     calculatedFromValue = BigDecimal(0)
+                    calculatedToValueText = ""
                     calculateToValue()
                 } },
-            textFieldValue = calculatedFromValue.toString()
+            textFieldValue = calculatedToValueText
         )
         //Conversion rate Text:
         ConversionRateText(
             conversionRate = calculationNumber.toString(),
             fromCurrency = satSelectedFromCurrency,
             toCurrency = satSelectedToCurrency,
+            updatedDate = updatedDate
         )
         //Converted currency box:
         ToRow(
@@ -147,6 +166,7 @@ fun MainCurrencyBox(
             onClick = { showToCurrencyList = !showToCurrencyList },
             calculatedCurrencyValue = calculatedToValue.toString(),
         )
+
     }
 
     //Opens Select currency from list:
@@ -276,19 +296,23 @@ fun SelectedCurrencyText(
 /**
  * Text with info about conversion rate for selected currency from and to:
  * @param conversionRate: String gotten from server with conversion rate.
+ * @param fromCurrency: From selected currency
+ * @param toCurrency: To selected currency
+ * @param updatedDate: Date currency was last updated
  */
 @Composable
 fun ConversionRateText(
+    modifier: Modifier = Modifier,
     conversionRate: String = "",
     fromCurrency: String,
     toCurrency: String,
-    modifier: Modifier = Modifier
-
+    updatedDate: String
 ) {
     var text = ""
     val conversionCalculation =  BigDecimal(1) * conversionRate.toBigDecimal()
     if(conversionRate != "") {
-        text += "1 $fromCurrency ${stringResource(id = R.string.equals)} $conversionCalculation $toCurrency"
+        text += "1 $fromCurrency ${stringResource(id = R.string.equals)} $conversionCalculation $toCurrency.\n" +
+                "Updated $updatedDate 23:59:59"
     }
     Text(
         text = text,
