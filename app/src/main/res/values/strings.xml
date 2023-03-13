@@ -3,4 +3,6 @@
     <string name="welcome_to_currency_calculator">Welcome to currency calculator</string>
     <string name="no_internet">No internet connection</string>
     <string name="conversion_rate">Conversion rate</string>
+    <string name="trouble_fetching">Trouble fetching currency rates right now, try again later</string>
+    <string name="equals">equals</string>
 </resources>

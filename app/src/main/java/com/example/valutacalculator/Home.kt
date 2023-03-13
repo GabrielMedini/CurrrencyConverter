@@ -1,16 +1,14 @@
 package com.example.valutacalculator
 
 import android.content.Context
+import android.widget.Toast
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AttachMoney
-import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -30,13 +28,13 @@ import java.math.BigDecimal
 
 
 val currencyListFrom = setCurrencyList()
-val currencyListTo = setCurrencyList()
 
-
+/**
+ * Main function on home screen containing all home screen UI:
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun Home() {
-    var shouldShowOnBoarding by rememberSaveable { mutableStateOf(true) }
     Scaffold(
         topBar = { AppBar() }
     ) { padding ->
@@ -48,16 +46,19 @@ fun Home() {
     }
 }
 
+/**
+ * Main Holder for all UI and logic:
+ */
 @Composable
 fun MainCurrencyBox(
     context: Context,
     currencyList: List<Currency>,
     modifier: Modifier = Modifier
 ) {
+    //For updating start values one time:
     var firstLaunch by rememberSaveable{
         mutableStateOf(true)
     }
-
     //Setting state for showing currency lists:
     var showFromCurrencyList by rememberSaveable{
         mutableStateOf(false)
@@ -65,101 +66,101 @@ fun MainCurrencyBox(
     var showToCurrencyList by rememberSaveable{
         mutableStateOf(false)
     }
+    //Contains selected from currency:
     var satSelectedFromCurrency by rememberSaveable{
-        mutableStateOf(selectedFromCurrency)
+        mutableStateOf(START_FROM_CURRENCY)
     }
+    //Contains selected to currency:
     var satSelectedToCurrency by rememberSaveable{
-        mutableStateOf(selectedToCurrency)
+        mutableStateOf(START_TO_CURRENCY)
     }
-
+    //General coroutine scope for async task:
     val coroutineScope = rememberCoroutineScope()
-
+    //Conversation number that is used to calculate to currency:
     var calculationNumber by rememberSaveable{
         mutableStateOf(BigDecimal(0))
     }
-
+    //Number value from (currency):
     var calculatedFromValue by rememberSaveable{
         mutableStateOf(BigDecimal(100))
     }
-
+    //Number value to (currency):
     var calculatedToValue by rememberSaveable{
         mutableStateOf(BigDecimal(0))
     }
-
-
+    //Calculates the to currency value:
     val calculateToValue: () -> Unit = {
         coroutineScope.launch {
             calculatedToValue = calculatedFromValue * calculationNumber
         }
     }
-
-
+    //Fetching conversation number from server, Class: CurrencyCalculator:
     val updateCurrencyCalculationNumberOnClick: () -> Unit = {
         coroutineScope.launch {
-            calculationNumber = CurrencyCalculator().calculateCurrency(
+            //If 0 error, else good:
+            val serverCalculationNumber = CurrencyCalculator().calculateCurrency(
                 context = context,
                 fromCurrency = satSelectedFromCurrency,
                 toCurrency = satSelectedToCurrency
             )
-            calculateToValue()
+            if(serverCalculationNumber != BigDecimal(0)) {
+                calculationNumber = serverCalculationNumber
+                calculateToValue()
+            } else {
+                Toast.makeText(context, R.string.trouble_fetching, Toast.LENGTH_SHORT).show()
+            }
         }
     }
-
+    //Does one initial calculation based on default startup values:
     if(firstLaunch) {
         updateCurrencyCalculationNumberOnClick()
         firstLaunch = false
     }
 
-
-
+    //Main UI windows:
     Column(modifier = modifier
-        .padding(horizontal = 12.dp, vertical = 16.dp)
+        .padding(horizontal = 16.dp, vertical = 16.dp)
     ) {
-        //Selected from currency:
-        SelectedCurrencyText(
+        //From Currency box:
+        FromRow(
             selectedCurrency = satSelectedFromCurrency,
-            onClick = { showFromCurrencyList = !showFromCurrencyList }
-        )
-
-        //From currency value:
-        CurrencyValueTextField(
+            onClick = { showFromCurrencyList = !showFromCurrencyList },
             onValueChange = {fromValue ->
                 if(fromValue != "") {
-                    calculatedFromValue = fromValue.toBigDecimal()
+                calculatedFromValue = fromValue.toBigDecimal()
+                calculateToValue()
+                } else {
+                    calculatedFromValue = BigDecimal(0)
                     calculateToValue()
-                }
-        },
+                } },
             textFieldValue = calculatedFromValue.toString()
         )
         //Conversion rate Text:
-        ConversionRateText(conversionRate = calculationNumber.toString(),)
-
-
-
-        //Selected to currency:
-        SelectedCurrencyText(
-            selectedCurrency = satSelectedToCurrency,
-            onClick = { showToCurrencyList = !showToCurrencyList }
+        ConversionRateText(
+            conversionRate = calculationNumber.toString(),
+            fromCurrency = satSelectedFromCurrency,
+            toCurrency = satSelectedToCurrency,
         )
-
-        //To currency value:
-        CalculatedToText(text = calculatedToValue.toString())
+        //Converted currency box:
+        ToRow(
+            selectedCurrency = satSelectedToCurrency,
+            onClick = { showToCurrencyList = !showToCurrencyList },
+            calculatedCurrencyValue = calculatedToValue.toString(),
+        )
     }
-    //Select currency from list
+
+    //Opens Select currency from list:
     if(showFromCurrencyList) {
         CurrencyList(currencyList, onclick = { title ->
             satSelectedFromCurrency = title
-            selectedFromCurrency = title
             showFromCurrencyList = !showFromCurrencyList
-            println(title)
             updateCurrencyCalculationNumberOnClick()
         })
     }
-    //Select currency to list
+    //Opens Select currency to list:
     if(showToCurrencyList) {
         CurrencyList(currencyList, onclick = { title ->
             satSelectedToCurrency =  title
-            selectedToCurrency = title
             showToCurrencyList = !showToCurrencyList
             updateCurrencyCalculationNumberOnClick()
         })
@@ -167,47 +168,89 @@ fun MainCurrencyBox(
 
 }
 
-
-
-
-
-
-
+/**
+ * Top app bar
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun AppBar() {
-    TopAppBar(
-        navigationIcon = {
-            Icon(
-                imageVector = Icons.Default.AttachMoney,
-                contentDescription = null,
-                modifier = Modifier.padding(horizontal = 12.dp)
-            )
-        },
-        title = {
-            Text(text = stringResource(R.string.app_name))
-        }
-    )
-}
-
-@Composable
-fun Header(
-    text: String,
-    modifier: Modifier = Modifier
-) {
-        Text(
-            text = text,
-            style = MaterialTheme.typography.headlineMedium,
-            modifier = modifier
-                .fillMaxWidth()
-                .semantics { heading() }
-                .padding(horizontal = 16.dp, vertical = 8.dp)
+        TopAppBar(
+            navigationIcon = {
+                Icon(
+                    imageVector = Icons.Default.AttachMoney,
+                    contentDescription = null,
+                    modifier = Modifier.padding(horizontal = 12.dp)
+                )
+            },
+            title = {
+                Text(
+                    text = stringResource(R.string.app_name),
+                    style = MaterialTheme.typography.headlineMedium
+                )
+            },
         )
 }
 
+/**
+ * Box containing elements:
+ * FROM currency with popup list onClick and Text field with value to be calculated.
+ * Including params for hosting elements.
+ */
+@Composable
+fun FromRow(
+    selectedCurrency: String,
+    onClick: () -> Unit,
+    onValueChange: (String) -> Unit,
+    textFieldValue: String,
+    modifier: Modifier = Modifier
 
+) {
+    Row( horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+        SelectedCurrencyText(
+            selectedCurrency = selectedCurrency,
+            onClick = { onClick() },
+            modifier = modifier
+        )
+        CurrencyValueTextField(
+            onValueChange =  onValueChange,
+            textFieldValue = textFieldValue,
+            modifier = modifier
+        )
+    }
+}
 
+/**
+ *
+ * Box containing elements:
+ * TO currency with popup list onClick and Text with calculated converted value:
+ * @param selectedCurrency: The currency that is selected
+ * @param onClick: Lambda function to trigger showing currency list
+ * @param calculatedCurrencyValue: the number value of calculated "to" currency.
+ *
+ */
+@Composable
+fun ToRow(
+    selectedCurrency: String,
+    onClick: () -> Unit,
+    calculatedCurrencyValue: String,
+    modifier: Modifier = Modifier
+) {
+    Row( horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+        SelectedCurrencyText(
+            selectedCurrency = selectedCurrency,
+            onClick = { onClick() },
+            modifier = modifier
+        )
+        //To currency value text:
+        CalculatedToText(text = calculatedCurrencyValue.toString())
+    }
+}
 
+/**
+ * Surface with selected Currency text:
+ * @param selectedCurrency: String (String with selected Currency).
+ * @param onClick: Lambda function to trigger showing currency list.
+ */
 @Composable
 fun SelectedCurrencyText(
     selectedCurrency: String,
@@ -215,42 +258,53 @@ fun SelectedCurrencyText(
     modifier: Modifier = Modifier
 ) {
     Surface(
-        color = MaterialTheme.colorScheme.onSurface.copy(0.1f),
+        color = MaterialTheme.colorScheme.primary,
         shape = MaterialTheme.shapes.small
     ) {
         Text(
             text = selectedCurrency,
             style = MaterialTheme.typography.headlineMedium,
             modifier = modifier
-                .fillMaxWidth()
                 .semantics { heading() }
                 .clickable { onClick() }
-                .padding(16.dp)
+                .padding(vertical = 12.dp, horizontal = 16.dp)
+                .width(100.dp)
         )
     }
 }
 
+/**
+ * Text with info about conversion rate for selected currency from and to:
+ * @param conversionRate: String gotten from server with conversion rate.
+ */
 @Composable
 fun ConversionRateText(
     conversionRate: String = "",
+    fromCurrency: String,
+    toCurrency: String,
     modifier: Modifier = Modifier
 
 ) {
     var text = ""
+    val conversionCalculation =  BigDecimal(1) * conversionRate.toBigDecimal()
     if(conversionRate != "") {
-        text += " ${stringResource(id = R.string.conversion_rate)}: $conversionRate"
+        text += "1 $fromCurrency ${stringResource(id = R.string.equals)} $conversionCalculation $toCurrency"
     }
     Text(
         text = text,
-        style = MaterialTheme.typography.headlineSmall,
+        style = MaterialTheme.typography.bodyMedium,
         modifier = modifier
             .fillMaxWidth()
             .semantics { heading() }
-            .padding(16.dp)
+            .padding(vertical = 16.dp, horizontal = 12.dp)
     )
 }
 
-
+/**
+ * Text Field where user can write number to be calculated:
+ * @param onValueChange: Lambda function that triggers new calculation and updates the UI.
+ * @param textFieldValue: Value of the TextField
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CurrencyValueTextField(
@@ -264,10 +318,13 @@ fun CurrencyValueTextField(
         onValueChange = {onValueChange(it)},
         modifier = modifier
             .fillMaxWidth()
-            .padding(top = 16.dp)
         )
 }
 
+/**
+ * Text that shows the calculated value:
+ * @param text: String with calculated value.
+ */
 @Composable
 fun CalculatedToText(
     text: String,
@@ -276,18 +333,24 @@ fun CalculatedToText(
     Text(
         text = text,
         style = MaterialTheme.typography.headlineMedium,
-        modifier = Modifier.padding(16.dp)
+        modifier = modifier
+            .padding(top = 12.dp, bottom = 8.dp)
     )
 }
 
-
+/**
+ * CurrencyList
+ * List with all currencies
+ * @param currencyList: List containing all available values. List is defined in Currency file.
+ * @param onclick: lambda function that triggers on selection of currency in list
+ */
 @Composable
 fun CurrencyList(
     currencyList: List<Currency>,
     onclick: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Surface(modifier = Modifier.padding(horizontal = 20.dp)) {
+    Surface(modifier = Modifier.padding(horizontal = 16.dp, vertical = 70.dp)) {
         LazyColumn(modifier = modifier) {
             items(currencyList) {
                 CurrencyListItem(
@@ -300,11 +363,11 @@ fun CurrencyList(
     }
 }
 
-
-
-
-
-
+/**
+ * Contains one Currency item for use in currency list.
+ * @param label: Short string label with for.ex (EUR)
+ * @param title: long name of currency for.ex (
+ */
 @Composable
 fun CurrencyListItem(
     label: String,
@@ -324,18 +387,14 @@ fun CurrencyListItem(
 }
 
 
-
-
-@Composable
-fun CurrencyTextField() {
-
-}
-
+/**
+ * COMPOSABLE PREVIEWS:
+ */
 @Preview(showBackground = true)
 @Composable
-fun AppBarPreview() {
+fun FromRowPreview() {
     CurrencyConverterTheme {
-        AppBar()
+        FromRow("EUR", {}, {}, "100")
     }
 }
 
@@ -368,7 +427,7 @@ fun CurrencyListPreview() {
 @Composable
 fun CurrencyTextFieldPreview() {
     CurrencyConverterTheme {
-        CurrencyTextField()
+        //CurrencyTextField()
     }
 }
 

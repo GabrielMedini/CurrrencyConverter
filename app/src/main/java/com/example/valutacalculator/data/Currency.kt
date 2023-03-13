@@ -1,12 +1,10 @@
 package com.example.valutacalculator.data
 
-import java.math.BigDecimal
-
 class Currency(val shortLabel: String, val title: String)
 
-var selectedFromCurrency = "NOK"
-var selectedToCurrency = "EUR"
-var calculationNumber = BigDecimal(0)
+//Start currency values
+const val START_FROM_CURRENCY = "NOK"
+const val START_TO_CURRENCY = "USD"
 
 fun setCurrencyList() = listOf(
         Currency("EUR", "Euro"),

@@ -18,9 +18,23 @@ import java.math.BigDecimal
 import java.util.concurrent.TimeUnit
 
 
-class CurrencyCalculator() {
+/**
+ * CurrencyCalculator
+ * Checks internet connection status and contacts API for getting currency rates:
+ */
 
-    //Set currencies:
+class CurrencyCalculator {
+
+    /**
+     * Main function for calculating Currency
+     * 1. Check internet
+     * 2. make call to server
+     * 3. return with conversation rate.
+     * @param context: Application Context
+     * @param fromCurrency: String with "from" currency for.ex "EUR"
+     * @param toCurrency: String with "to" currency for.ex "USD"
+     * @return BigDecimal: if error 0 else conversion rate.
+     */
     suspend fun calculateCurrency(
         context: Context,
         fromCurrency: String,
@@ -50,12 +64,21 @@ class CurrencyCalculator() {
         return if(!jsonObject.has("message")) {
             val element = jsonObject["data"].toString()
             JSONObject(element)[toCurrency].toString().toBigDecimal()
+            //For testing error toast:
+            //BigDecimal(0)
 
         } else {
             BigDecimal(0)
         }
     }
 
+    /**
+     * Makes the call to a server:
+     * @param context: Application context
+     * @param tag: tag for debugging
+     * @param fromCurrency: String with "from" currency for.ex "EUR"
+     * @param toCurrency: String with "to" currency for.ex "USD"
+     */
     private suspend fun serverCall(
         context: Context,
         tag: String,
@@ -77,7 +100,7 @@ class CurrencyCalculator() {
             override fun onResponse(call: Call, response: Response) {
                 CoroutineScope(IO + serverResponse).launch {
                         returnString = response.body?.string().toString()
-                        Log.i(tag, "Got response from server: $returnString")
+                        //Log.i(tag, "Got response from server: $returnString")
                         serverResponse.complete()
                     }
                 }
@@ -92,13 +115,17 @@ class CurrencyCalculator() {
         return returnString
     }
 
-    //Check internet connection:
+
+    /**
+     * Checks for internet connection (async and waits and tries connection on a timed connection loop).
+     * Timing is defined in companion.
+     */
     private suspend fun internetConnectLooper(context: Context, tag: String) {
         isConnectedToInternet = false
         if(!isOnline(context)) {
             val currentTime = System.currentTimeMillis().toInt()
             val timeDiff = currentTime-toastTimestamp
-            if(firstDisconnect || timeDiff>=NO_CONNECTION_TOAST_WAIT_TIME) {
+            if(firstDisconnect || timeDiff>=NO_CONNECTION_WAIT_TIME) {
                 withContext(Dispatchers.Main) {
                     toastTimestamp = System.currentTimeMillis().toInt()
                     Toast.makeText(context, R.string.no_internet, Toast.LENGTH_SHORT).show()
@@ -115,6 +142,7 @@ class CurrencyCalculator() {
                         isConnectedToInternet = true
                         connectionTesterLoop.complete()
                     }
+                    //Toast for missing connection:
                     /*
                     while (!isConnectedToInternet) {
                         println("TEST 7, tag: $tag context: $context, First connect: $firstDisconnect")
@@ -132,7 +160,9 @@ class CurrencyCalculator() {
         }
     }
 
-    //Is connected:
+    /**
+     * Checks device networking capabilities:
+     */
     private fun isOnline(context: Context): Boolean {
         val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
         val capabilities = connectivityManager.getNetworkCapabilities(connectivityManager.activeNetwork)
@@ -151,13 +181,6 @@ class CurrencyCalculator() {
         return false
     }
 
-    //Check if already running:
-
-
-
-
-    //Send request for new currencies:
-
     companion object {
         private var calculateCurrencyJob = Job()
         private const val TAG = "CURRENCY CALCULATING JOB"
@@ -167,7 +190,7 @@ class CurrencyCalculator() {
         var firstDisconnect = true
         private val waitingForConnectionJob = Job()
         private var toastTimestamp = 0
-        const val NO_CONNECTION_TOAST_WAIT_TIME = 5000
+        const val NO_CONNECTION_WAIT_TIME = 5000
         val HTTP_CLIENT = OkHttpClient()
             .newBuilder()
             .connectTimeout(5, TimeUnit.MINUTES)

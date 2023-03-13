@@ -4,8 +4,10 @@ import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 
 
+/**
+ * Main Class that handles Networking by using OkHttpClient
+ */
 class Networking(private val client: OkHttpClient, private val tag: String) {
-
 
     init {
         //Kill earlier request with same tag:
@@ -25,7 +27,6 @@ class Networking(private val client: OkHttpClient, private val tag: String) {
             System.gc()
         }
     }
-
 
     fun get(url: String, callback: Callback): Call {
         val request = Request.Builder()
