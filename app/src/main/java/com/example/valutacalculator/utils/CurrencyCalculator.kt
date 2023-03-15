@@ -44,7 +44,7 @@ class CurrencyCalculator {
         var jsonObject = JSONObject()
 
         if(calculateCurrencyJob.isActive || calculateCurrencyJob.isCompleted) {
-            calculateCurrencyJob.cancel("reset calculating job")
+            calculateCurrencyJob.cancel("Resetting calculating job")
             calculateCurrencyJob = Job()
         }
 
@@ -91,7 +91,7 @@ class CurrencyCalculator {
         internetConnectLooper(context, tag)
         //Do stuff
         var returnString = String()
-        val request = Networking(HTTP_CLIENT, tag)
+        val request = Networking(tag)
         val url = """
             $SERVER_ADDRESS_URL
             &base_currency=$fromCurrency
@@ -175,12 +175,6 @@ class CurrencyCalculator {
         private var toastTimestamp = 0
         const val TOAST_ERROR_NO_CONNECTION_WAIT_TIME = 5000
         const val ATTEMPTING_CONNECTION_WAIT_TIME = 3000L
-        val HTTP_CLIENT = OkHttpClient()
-            .newBuilder()
-            .connectTimeout(5, TimeUnit.MINUTES)
-            .writeTimeout(5, TimeUnit.MINUTES)
-            .readTimeout(5, TimeUnit.MINUTES)
-            .build()
     }
 
 }
