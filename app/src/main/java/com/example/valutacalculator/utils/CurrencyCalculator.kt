@@ -28,8 +28,8 @@ class CurrencyCalculator {
     /**
      * Main function for calculating Currency
      * 1. Check internet
-     * 2. make call to server
-     * 3. return with conversation rate.
+     * 2. Make call to server
+     * 3. Return with conversion rate.
      * @param context: Application Context
      * @param fromCurrency: String with "from" currency for.ex "EUR"
      * @param toCurrency: String with "to" currency for.ex "USD"
@@ -40,28 +40,30 @@ class CurrencyCalculator {
         fromCurrency: String,
         toCurrency: String
     ): BigDecimal {
+
         var jsonObject = JSONObject()
+
         if(calculateCurrencyJob.isActive || calculateCurrencyJob.isCompleted) {
             calculateCurrencyJob.cancel("reset calculating job")
             calculateCurrencyJob = Job()
         }
+
         CoroutineScope(IO + calculateCurrencyJob).launch(COROUTINE_EXCEPTION_HANDLER) {
-            val setCurrencyJob = launch {
-                jsonObject = JSONObject(serverCall(context, "GET CURRENCY", fromCurrency, toCurrency))
-            }
-            setCurrencyJob.join()
+            jsonObject = JSONObject(serverCall(context, "GET CURRENCY", fromCurrency, toCurrency))
             calculateCurrencyJob.complete()
         }
 
         calculateCurrencyJob.invokeOnCompletion {
             if(it != null) {
-                Log.i(TAG, "Error finding recipes: $it")
+                Log.i(TAG, "Error finding getting currency: $it")
             }
         }
+
         calculateCurrencyJob.join()
+
         //Check response:
-        //the return will have a message if error, else good:
-        return if(!jsonObject.has("message")) {
+        //The return will have a message if error, else good:
+        return if(!jsonObject.has("message") && jsonObject.has("data")) {
             val element = jsonObject["data"].toString()
             JSONObject(element)[toCurrency].toString().toBigDecimal()
             //For testing error toast:
@@ -95,14 +97,10 @@ class CurrencyCalculator {
             &base_currency=$fromCurrency
             &currencies=$toCurrency
             """.trimIndent()
-        val serverResponse = Job()
         request.get(url, object : Callback {
             override fun onResponse(call: Call, response: Response) {
-                CoroutineScope(IO + serverResponse).launch {
-                        returnString = response.body?.string().toString()
-                        //Log.i(tag, "Got response from server: $returnString")
-                        serverResponse.complete()
-                    }
+                returnString = response.body?.string().toString()
+                //Log.i(tag, "Got response from server: $returnString")
                 }
                 override fun onFailure(call: Call, e: IOException) {
                     Log.i(tag, "error contacting server: $e")
@@ -111,7 +109,9 @@ class CurrencyCalculator {
             })
 
         //Wait for server response and return:
-        serverResponse.join()
+        while(returnString == "") {
+            delay(1000)
+        }
         return returnString
     }
 
@@ -121,42 +121,26 @@ class CurrencyCalculator {
      * Timing is defined in companion.
      */
     private suspend fun internetConnectLooper(context: Context, tag: String) {
-        isConnectedToInternet = false
         if(!isOnline(context)) {
+            //Toast message to user if a new disconnect is true, or waiting time for new toast is reached:
             val currentTime = System.currentTimeMillis().toInt()
-            val timeDiff = currentTime-toastTimestamp
-            if(firstDisconnect || timeDiff>=NO_CONNECTION_WAIT_TIME) {
-                withContext(Dispatchers.Main) {
+            val timeDiff = currentTime - toastTimestamp
+            if( newDisconnect || timeDiff >= TOAST_ERROR_NO_CONNECTION_WAIT_TIME ) {
+                withContext( Dispatchers.Main ) {
                     toastTimestamp = System.currentTimeMillis().toInt()
                     Toast.makeText(context, R.string.no_internet, Toast.LENGTH_SHORT).show()
                 }
             }
-            if(firstDisconnect) {
-                firstDisconnect = false
-                CoroutineScope(IO + waitingForConnectionJob).launch(COROUTINE_EXCEPTION_HANDLER) {
-                    val connectionTesterLoop = Job()
-                    CoroutineScope(IO + connectionTesterLoop).launch {
-                        while(!isOnline(context)) {
-                            delay(3000)
-                        }
-                        isConnectedToInternet = true
-                        connectionTesterLoop.complete()
-                    }
-                    //Toast for missing connection:
-                    /*
-                    while (!isConnectedToInternet) {
-                        println("TEST 7, tag: $tag context: $context, First connect: $firstDisconnect")
-                        withContext(Main) {
-                            Toast.makeText(context, R.string.no_internet, Toast.LENGTH_SHORT).show()
-                        delay(20000)
-                    }
-                    */
-                    connectionTesterLoop.join()
-                    waitingForConnectionJob.complete()
-                    firstDisconnect = true
-                }
+            //Waiting for internet connection and attempting to connect:
+            newDisconnect = false
+            isConnectedToInternet = false
+            while(!isOnline(context)) {
+                delay(ATTEMPTING_CONNECTION_WAIT_TIME)
+                //Log.i("Internet", "Attempting to get internet connection...")
             }
-            waitingForConnectionJob.join()
+            //internet connection is established:
+            isConnectedToInternet = true
+            newDisconnect = true
         }
     }
 
@@ -187,10 +171,10 @@ class CurrencyCalculator {
         private val COROUTINE_EXCEPTION_HANDLER = CoroutineExceptionHandler { _, exception -> Log.i(TAG, "Error: $exception")}
         private const val SERVER_ADDRESS_URL = "https://api.freecurrencyapi.com/v1/latest?apikey=TIVsbtVazp1JvyHbowJ6StsOMIQN06CQT9ubWuB1"
         var isConnectedToInternet = false
-        var firstDisconnect = true
-        private val waitingForConnectionJob = Job()
+        var newDisconnect = true
         private var toastTimestamp = 0
-        const val NO_CONNECTION_WAIT_TIME = 5000
+        const val TOAST_ERROR_NO_CONNECTION_WAIT_TIME = 5000
+        const val ATTEMPTING_CONNECTION_WAIT_TIME = 3000L
         val HTTP_CLIENT = OkHttpClient()
             .newBuilder()
             .connectTimeout(5, TimeUnit.MINUTES)

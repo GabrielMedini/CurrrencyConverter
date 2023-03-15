@@ -7,7 +7,8 @@ import okhttp3.MediaType.Companion.toMediaTypeOrNull
 /**
  * Main Networking Class that sets up OkHttpClient
  */
-class Networking(private val client: OkHttpClient, private val tag: String) {
+
+class Networking (private val client: OkHttpClient, private val tag: String) {
 
     init {
         //Kill earlier request with same tag:

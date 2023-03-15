@@ -141,8 +141,8 @@ fun MainCurrencyBox(
         FromRow(
             selectedCurrency = satSelectedFromCurrency,
             onClick = { showFromCurrencyList = !showFromCurrencyList },
-            onValueChange = {fromValue ->
-                if(fromValue != "") {
+            onValueChange = { fromValue ->
+                if( fromValue.toBigDecimalOrNull() != null ) {
                     calculatedFromValue = fromValue.toBigDecimal()
                     calculatedToValueText = fromValue
                     calculateToValue()
